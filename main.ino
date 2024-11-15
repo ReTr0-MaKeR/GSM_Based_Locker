@@ -36,13 +36,14 @@ const int buzzerPin = 13;
 
 // SIM800L setup
 SoftwareSerial mySerial(3, 2); // SIM800L Tx & Rx connected to Arduino pins 3 & 2
-
+int count= 1;
 void setup() {
   Serial.begin(9600);
   mySerial.begin(9600);
 
   lcd.begin(16, 2);
   lcd.backlight();
+  lcd.setCursor(1, 0);
   lcd.print("Locker Started");
 
   pinMode(buzzerPin, OUTPUT);
@@ -55,6 +56,9 @@ void setup() {
   delay(1000);
   mySerial.println("AT+CMGF=1"); // Configure for TEXT mode
   delay(1000);
+  lcd.clear();
+  lcd.setCursor(2, 0);
+  lcd.print("Enter PIN:");
 }
 
 void loop() {
@@ -65,25 +69,34 @@ void loop() {
       // Start new password entry
       passwordIndex = 0;
       lcd.clear();
-      lcd.print("Enter PIN:");
+      lcd.setCursor(2, 0);
+      lcd.print("Enter PIN");
     } else if (customKey == '#') {
       // Check entered password
       inputPassword[passwordIndex] = '\0'; // Null-terminate the password
 
       if (strcmp(inputPassword, correctPassword) == 0) {
         lcd.clear();
+        lcd.setCursor(1, 0);
         lcd.print("Access Granted");
         digitalWrite(buzzerPin, HIGH);
         delay(200);
         digitalWrite(buzzerPin, LOW);
         delay(200);
-
         myServo.write(0); // Unlock servo
+        count = 1;
         isUnlocked = true;
       } else {
         lcd.clear();
+        lcd.setCursor(2, 0);
         lcd.print("Access Denied");
-        
+        lcd.setCursor(2, 1);
+        lcd.print("Wrong attempt: ");
+        lcd.setCursor(0, 1);
+        lcd.print("Wrong attempt: ");
+        lcd.setCursor(15, 1);
+        lcd.print(count);
+        count = count+1;
         // Flash LED for incorrect entry
         for (int i = 0; i < 5; i++) {
           digitalWrite(buzzerPin, HIGH);
@@ -91,22 +104,33 @@ void loop() {
           digitalWrite(buzzerPin, LOW);
           delay(200);
         }
-
-        // Send SMS notification
-        sendSMS();
+        Serial.print("Count: ");
+        Serial.print(count);
+        Serial.println("");
+        if(count == 4)
+        {
+          sendSMS();// Send SMS notification
+          count = 1;
+        }
+        
       }
       delay(1000); // Pause before resetting
       lcd.clear();
+      lcd.setCursor(2, 0);
       lcd.print("Enter PIN:");
       passwordIndex = 0; // Reset password index for next entry
     } else if (customKey == 'C' && isUnlocked) {
+
       // Reset servo to idle position when 'C' is pressed and it's unlocked
+
       myServo.write(150); // Lock servo
       isUnlocked = false;
       lcd.clear();
-      lcd.print("Locked");
+      lcd.setCursor(3, 0);
+      lcd.print("Door Locked");
       delay(1000);
       lcd.clear();
+      lcd.setCursor(2, 0);
       lcd.print("Enter PIN:");
     } else {
       // Record each digit if not * or #
@@ -126,15 +150,13 @@ void sendSMS() {
   lcd.print("Sending SMS...");
   delay(500);
 
-  mySerial.println("AT+CMGS=\"+8801878782806\""); // Replace with target phone number
+  mySerial.println("AT+CMGS=\"+8801821318824\""); // Replace with target phone number
   delay(1000);
-  mySerial.print("Unauthorized access attempt detected!");
+  mySerial.print("Alert!!! Unauthorized access attempt detected!");
   mySerial.write(26); // ASCII code for Ctrl+Z to send the message
   delay(2000); // Wait for message to send
 
-  // Display SMS sending status
-  lcd.clear();
-  lcd.print("SMS Sent");
+ 
 
   // Display responses from SIM800L
   delay(500);
@@ -153,6 +175,13 @@ void sendSMS() {
     }
   }
   delay(2000); // Pause to allow reading the response
+  
+  // Display SMS sending status
   lcd.clear();
+  lcd.setCursor(2, 0);
+  lcd.print("SMS Sent");
+  delay(2000); 
+  lcd.clear();
+  lcd.setCursor(2, 0);
   lcd.print("Enter PIN:");
 }
